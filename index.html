@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Capture o Ponto — Jogo Simples</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#06b6d4;
+      --muted:#94a3b8;
+      --danger:#ef4444;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{margin:0;background:linear-gradient(180deg,var(--bg) 0%, #071022 100%);color:#e6eef6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+
+    .container{width:100%;max-width:980px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:grid;grid-template-columns:320px 1fr;gap:20px}
+
+    /* painel lateral */
+    .panel{background:var(--card);padding:18px;border-radius:10px;display:flex;flex-direction:column;gap:12px}
+    h1{font-size:18px;margin:0 0 6px 0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .stats{display:flex;gap:10px;margin-top:6px}
+    .stat{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;flex:1;text-align:center}
+    .stat .num{font-size:20px;font-weight:700}
+    .controls{display:flex;gap:8px;margin-top:8px}
+    button{background:var(--accent);color:#022;border:none;padding:10px 12px;border-radius:8px;font-weight:700;cursor:pointer}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+    .options{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    label{font-size:13px;color:var(--muted)}
+    select,input[type=range]{width:100%;appearance:none}
+
+    /* área do jogo */
+    .game-area{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.03);border-radius:10px;padding:14px;display:flex;flex-direction:column}
+    .top-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .arena{flex:1;background:linear-gradient(180deg,#061028 0%, #06162a 100%);margin-top:14px;border-radius:10px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,0.02)}
+
+    .target{position:absolute;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;cursor:pointer;user-select:none;transform:translate(-50%,-50%);box-shadow:0 8px 20px rgba(4,10,20,0.6)}
+    .target .inner{width:86%;height:86%;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent);color:#032;}
+
+    footer.note{font-size:12px;color:var(--muted);margin-top:12px;text-align:center}
+
+    /* responsivo */
+    @media (max-width:840px){.container{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="panel" aria-label="Painel de Jogo">
+      <h1>Capture o Ponto</h1>
+      <p class="lead">Clique no ponto que aparece na arena para marcar pontos. O tempo corre — boa sorte!</p>
+
+      <div class="stats" aria-hidden>
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Pontos</div>
+          <div id="score" class="num">0</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Tempo</div>
+          <div id="time" class="num">30</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Recorde</div>
+          <div id="highscore" class="num">0</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn">Iniciar</button>
+        <button id="resetBtn" class="btn-ghost">Reiniciar</button>
+      </div>
+
+      <div class="options">
+        <label for="duration">Duração (segundos)</label>
+        <select id="duration">
+          <option value="15">15</option>
+          <option value="30" selected>30</option>
+          <option value="60">60</option>
+        </select>
+
+        <label for="difficulty">Dificuldade</label>
+        <select id="difficulty">
+          <option value="easy">Fácil</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Difícil</option>
+        </select>
+
+        <label for="sizeRange">Tamanho do alvo</label>
+        <input id="sizeRange" type="range" min="30" max="100" value="64" />
+      </div>
+
+      <div style="margin-top:8px;font-size:13px;color:var(--muted)">
+        <strong>Dicas:</strong>
+        <ul style="margin:6px 0 0 18px;padding:0;color:var(--muted)">
+          <li>Use o mouse ou toque na tela.</li>
+          <li>Aumente a duração para treinar.</li>
+          <li>Recorde é salvo no navegador.</li>
+        </ul>
+      </div>
+
+    </aside>
+
+    <main class="game-area" aria-label="Área do Jogo">
+      <div class="top-row">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="font-size:14px;color:var(--muted)">Status:</div>
+          <div id="status" style="font-weight:700">Pronto</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="font-size:13px;color:var(--muted)">Pressione <kbd>Space</kbd> para iniciar</div>
+        </div>
+      </div>
+
+      <div id="arena" class="arena" tabindex="0" aria-label="Arena do jogo">
+        <!-- alvo será gerado dinamicamente -->
+      </div>
+
+      <footer class="note">Feito com ❤️ — código limpo para estudar e modificar.</footer>
+    </main>
+  </div>
+
+  <script>
+    // Elementos
+    const arena = document.getElementById('arena');
+    const scoreEl = document.getElementById('score');
+    const timeEl = document.getElementById('time');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const statusEl = document.getElementById('status');
+    const durationSel = document.getElementById('duration');
+    const difficultySel = document.getElementById('difficulty');
+    const sizeRange = document.getElementById('sizeRange');
+    const highscoreEl = document.getElementById('highscore');
+
+    // Estado do jogo
+    let score = 0;
+    let timeLeft = parseInt(durationSel.value,10);
+    let timerId = null;
+    let moveInterval = null;
+    let targetSize = parseInt(sizeRange.value,10);
+    let target = null;
+    let running = false;
+
+    // Recupera recorde do localStorage
+    const HS_KEY = 'capture_o_ponto_highscore_v1';
+    function loadHighscore(){
+      const hs = parseInt(localStorage.getItem(HS_KEY)||'0',10);
+      highscoreEl.textContent = hs;
+      return hs;
+    }
+    loadHighscore();
+
+    // Atualiza o tamanho do alvo quando o slider muda
+    sizeRange.addEventListener('input',()=>{
+      targetSize = parseInt(sizeRange.value,10);
+      if(target) target.style.width = target.style.height = targetSize + 'px';
+    });
+
+    // Calcula intervalo de movimento baseado na dificuldade e no score
+    function getIntervalForDifficulty(){
+      const diff = difficultySel.value;
+      // base em ms
+      let base = 900;
+      if(diff === 'easy') base = 1200;
+      if(diff === 'normal') base = 900;
+      if(diff === 'hard') base = 600;
+      // acelera um pouco conforme o jogador soma pontos (com um limite)
+      const accel = Math.max(0, Math.min(600, Math.floor(score*8)));
+      return Math.max(150, base - accel);
+    }
+
+    // Cria e posiciona o alvo
+    function createTarget(){
+      // remove anterior
+      if(target && target.parentNode) target.parentNode.removeChild(target);
+      target = document.createElement('div');
+      target.className = 'target';
+      target.style.width = target.style.height = targetSize + 'px';
+
+      // inner color/label
+      const inner = document.createElement('div');
+      inner.className = 'inner';
+      inner.textContent = '';
+      target.appendChild(inner);
+
+      // clique — pontua
+      target.addEventListener('click',()=>{
+        if(!running) return;
+        score += 1;
+        scoreEl.textContent = score;
+        // reposiciona imediatamente
+        positionTargetRandom();
+        // ajusta velocidade
+        restartMoveInterval();
+      });
+
+      // suporte a toque — mesmo comportamento
+      target.addEventListener('touchstart', (e)=>{ e.preventDefault(); target.click(); });
+
+      arena.appendChild(target);
+      positionTargetRandom();
+    }
+
+    function positionTargetRandom(){
+      const rect = arena.getBoundingClientRect();
+      const padding = 8; // para não sair colado
+      const w = target.offsetWidth;
+      const h = target.offsetHeight;
+      // coordenadas relativas ao topo-esquerdo da arena
+      const x = Math.random() * (rect.width - w - padding*2) + padding + w/2;
+      const y = Math.random() * (rect.height - h - padding*2) + padding + h/2;
+      target.style.left = x + 'px';
+      target.style.top = y + 'px';
+    }
+
+    // Move target automaticamente em intervalos
+    function startMoveInterval(){
+      clearInterval(moveInterval);
+      const ms = getIntervalForDifficulty();
+      moveInterval = setInterval(()=>{
+        if(!running) return;
+        positionTargetRandom();
+      }, ms);
+    }
+
+    function restartMoveInterval(){
+      clearInterval(moveInterval);
+      startMoveInterval();
+    }
+
+    // Timer principal
+    function startTimer(){
+      clearInterval(timerId);
+      timerId = setInterval(()=>{
+        if(!running) return;
+        timeLeft -= 1;
+        timeEl.textContent = timeLeft;
+        if(timeLeft <= 0){
+          endGame();
+        }
+      },1000);
+    }
+
+    function startGame(){
+      if(running) return;
+      running = true;
+      score = 0;
+      scoreEl.textContent = score;
+      timeLeft = parseInt(durationSel.value,10);
+      timeEl.textContent = timeLeft;
+      statusEl.textContent = 'Jogando';
+      createTarget();
+      startMoveInterval();
+      startTimer();
+      // foco para permitir tecla space iniciar
+      arena.focus();
+    }
+
+    function endGame(){
+      running = false;
+      statusEl.textContent = 'Fim de jogo';
+      clearInterval(timerId);
+      clearInterval(moveInterval);
+      // remove alvo
+      if(target && target.parentNode) target.parentNode.removeChild(target);
+      target = null;
+      // salva recorde
+      const prev = parseInt(localStorage.getItem(HS_KEY)||'0',10);
+      if(score > prev){
+        localStorage.setItem(HS_KEY, String(score));
+        highscoreEl.textContent = score;
+      }
+      // pequeno flash no status
+      setTimeout(()=>{ statusEl.textContent = 'Pronto'; }, 1500);
+    }
+
+    function resetGame(){
+      running = false;
+      clearInterval(timerId);
+      clearInterval(moveInterval);
+      score = 0; timeLeft = parseInt(durationSel.value,10);
+      scoreEl.textContent = score; timeEl.textContent = timeLeft; statusEl.textContent = 'Pronto';
+      if(target && target.parentNode) target.parentNode.removeChild(target);
+      target = null;
+    }
+
+    // botões
+    startBtn.addEventListener('click', ()=>{
+      if(running) { endGame(); } else { startGame(); }
+    });
+    resetBtn.addEventListener('click', resetGame);
+
+    // Espaço inicia/pausa
+    window.addEventListener('keydown',(e)=>{
+      if(e.code === 'Space'){
+        e.preventDefault();
+        if(!running) startGame(); else endGame();
+      }
+    });
+
+    // quando a janela muda de tamanho, reajusta posição do alvo para não sumir
+    window.addEventListener('resize', ()=>{ if(target) positionTargetRandom(); });
+
+    // atualiza intervalo quando dificuldade muda
+    difficultySel.addEventListener('change', ()=>{ if(running) restartMoveInterval(); });
+
+    // atualiza duração quando muda
+    durationSel.addEventListener('change', ()=>{ timeLeft = parseInt(durationSel.value,10); timeEl.textContent = timeLeft; });
+
+    // inicializa valores visuais
+    scoreEl.textContent = score;
+    timeEl.textContent = timeLeft;
+
+    // acessibilidade: clique na arena foca para teclado
+    arena.addEventListener('click', ()=> arena.focus());
+
+    // Dica: caso queira estender — adicionar sons, efeitos, múltiplos alvos, ou um cursor-trail.
+  </script>
+</body>
+</html>
